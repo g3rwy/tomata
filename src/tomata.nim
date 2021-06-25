@@ -4,22 +4,22 @@ const
   MAX_FPS = 60
 
 var
-  W_width = 1280
-  W_height = 720
+  Window_size = Vector2(x:1280,y:720)
 
 setConfigFlags(WINDOW_RESIZABLE)
-initWindow(W_width, W_height, "Game of Life")
-
-#var camera = Camera()
+initWindow(cint(Window_size.x),cint(Window_size.y), "Game of Life")
 
 setTargetFPS(MAX_FPS)
 
 when isMainModule:
   echo("Hello, World÷!")
+
   while not windowShouldClose():
+    if isWindowResized(): Window_size = (x: getScreenWidth().toFloat, y: getScreenHeight().toFloat)
+
     beginDrawing()
     clearBackground Raywhite
-    discard windowBox((x:50.0,y:50.0,width:0.2 * float(getScreenWidth()) ,height:0.2 * float(getScreenHeight())),"Warning!")git 
+    #discard windowBox((x:50.0,y:50.0,width:0.7 * Window_size.x,height:0.7 * Window_size.y),"Warning!") # okay it seems like resizing UI works
     endDrawing()
 
 closeWindow()
