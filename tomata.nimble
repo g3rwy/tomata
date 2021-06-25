@@ -11,3 +11,4 @@ bin           = @["tomata"]
 # Dependencies
 
 requires "nim >= 1.4.4"
+requires "nimraylib_now >= 0.13.1"
