@@ -1,21 +1,27 @@
 import nimraylib_now
 const
-  BUFFER_SCALE = 3
-  WIDTH = 600
-  HEIGHT = 600
+  BUFFER_SCALE* = 3
+  WIDTH* = 600
+  HEIGHT* = 600
   STATES_COUNT = 2
 
 type
   cell_grid = array[ (HEIGHT.toFloat / BUFFER_SCALE.toFloat).toInt , array[ (WIDTH.toFloat / BUFFER_SCALE).toInt , uint8]]
 
 var
+  steps : uint = 0
   Window_size = Vector2(x:WIDTH,y:HEIGHT)
   buffer : cell_grid
   states_colors : array[STATES_COUNT, Color]
+  play : bool = true
+
+  n : cell_grid
+  base = cast[ptr cell_grid](addr buffer)
+  next_step = cast[ptr cell_grid](addr n)
 
 setConfigFlags(WINDOW_RESIZABLE)
 initWindow(cint(Window_size.x),cint(Window_size.y), "Game of Life")
-setTargetFPS(60)
+setTargetFPS(144)
 
 states_colors = [
   Red, # DEAD
@@ -28,51 +34,49 @@ proc randomizeGrid(grid : var cell_grid) =
       states = uint8(getRandomValue(0,1))
 
 proc countN(grid : var cell_grid, x: int, y: int) : int = # Count Neigbhours in donut maner
-  var sum = 0;
+  result = 0
   for i in -1 .. 1:
     for j in -1 .. 1:
-      let col = (x + i + buffer.len) mod buffer.len
-      let row = (y + j + buffer[0].len) mod buffer[0].len
-      sum += cast[int](grid[col][row])
+      let col = (x + i + base[].len) mod base[].len
+      let row = (y + j + base[0].len) mod base[0].len
+      result += cast[int](grid[col][row])
   
-  sum -= cast[int](grid[x][y])
-  return sum
+  result -= cast[int](grid[x][y])
 
-buffer.randomizeGrid
+base[].randomizeGrid
 
 when isMainModule:
   while not windowShouldClose():
-    var next : cell_grid
     if isWindowResized(): Window_size = (x: getScreenWidth().toFloat, y: getScreenHeight().toFloat)
 
     beginDrawing()
     clearBackground Raywhite
-
-    for i ,c in buffer.pairs:
+    for i ,c in base[].pairs:
       for j ,states in c.pairs:
         #let x = (BUFFER_SCALE * j)
         #let y = (BUFFER_SCALE * i)
         drawRectangle((BUFFER_SCALE * j) ,(BUFFER_SCALE * i) , BUFFER_SCALE , BUFFER_SCALE , states_colors[states])
 
+    if play:
+      for i ,c in base[].pairs:
+        for j ,states in c.pairs:
+          let n = base[].countN(i,j)
 
+          # RULES 
+          if base[i][j] == 0 and n == 3:
+            next_step[i][j] = 1
+          elif base[i][j] == 1 and (n < 2 or n > 3):
+            next_step[i][j] = 0
+          else:
+            next_step[i][j] = base[i][j]
 
-    for i ,c in buffer.pairs:
-      for j ,states in c.pairs:
-        let n = buffer.countN(i,j)
-        #let state = buffer[i][j]
-
-        # RULES 
-        if buffer[i][j] == 0 and n == 3:
-          next[i][j] = 1
-        elif buffer[i][j] == 1 and (n < 2 or n > 3):
-          next[i][j] = 0
-        else:
-          next[i][j] = buffer[i][j]
-
-    buffer = next
+      swap(base,next_step)
+      inc steps
     if isKeyReleased(Space):
-      buffer.randomizeGrid
-    drawFPS(10,10)
+      #buffer.randomizeGrid
+      play = not play
+    #drawFPS(10,10)
+    drawText("Steps: " & $steps,10,10,15,Black)
     endDrawing()
 
 closeWindow()
