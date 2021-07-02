@@ -62,12 +62,11 @@ var
   counter : float32 = 0
   cell_color : Color = (r: 0, g:50, b:220, a:255)
 
-proc getRandomColor() : Color = 
-  Color(r: uint8(getRandomValue(0,255)),g: uint8(getRandomValue(0,255)),b: uint8(getRandomValue(0,255)),a: uint8(getRandomValue(0,255)))
+#proc getRandomColor() : Color = 
+# Color(r: uint8(getRandomValue(0,255)),g: uint8(getRandomValue(0,255)),b: uint8(getRandomValue(0,255)),a: uint8(getRandomValue(0,255)))
 
 proc show(l : int) =
   for n in 0 ..< l:
-    var hsv = cell_color.colorToHSV()
     for i in countdown(LastBit, 0):
       if cached_lines[n].testB(i): drawRectangle(10 * i, 10 * n, 10,10, cell_color) else: continue
 

@@ -19,6 +19,7 @@ var
   base = cast[ptr cell_grid](addr buffer)
   next_step = cast[ptr cell_grid](addr n)
 
+
 setConfigFlags(WINDOW_RESIZABLE)
 initWindow(cint(Window_size.x),cint(Window_size.y), "Game of Life")
 setTargetFPS(144)
