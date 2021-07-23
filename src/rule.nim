@@ -1,5 +1,5 @@
 import nimraylib_now
-# test from new pc
+# test SSH
 const
   WIDTH* = 600
   HEIGHT* = 300
