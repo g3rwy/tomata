@@ -1,5 +1,5 @@
 import nimraylib_now
-# test SSH
+# test SSH, ugh why sublime don't want to work
 const
   WIDTH* = 600
   HEIGHT* = 300
