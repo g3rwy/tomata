@@ -1,11 +1,15 @@
 import nimraylib_now
-# testing SSH again?
+
 const
-  WIDTH* = 600
-  HEIGHT* = 300
-  Size = 60
+  WIDTH = 1280
+  HEIGHT = 640
+  SCALE = 2
+  Size = WIDTH div SCALE
   LastBit = Size - 1
   Lines = Size div 2
+
+when WIDTH / HEIGHT != 2:
+  raise newException(ValueError,"the propotions of window must be 1:2")
 
 var rule : uint8 = 250 # Main Rule, change it if you want it to start with other default rule 1-255
  
@@ -27,7 +31,7 @@ var
   curr_line : uint = 0
 
 initWindow(cint(WIDTH),cint(HEIGHT), "Elementary CA")
-setTargetFPS(144)
+#setTargetFPS(144)
 
 proc compute(state: var State, rule: uint8) =
   newState.reset # sets all bools to default value (0)
@@ -58,17 +62,14 @@ proc gen(rule : uint8) =
 
 var
   lines_rendered = 0
-  time_4_line = 0.1
+  time_4_line = 0.01
   counter : float32 = 0
   cell_color : Color = (r: 0, g:50, b:220, a:255)
-
-#proc getRandomColor() : Color = 
-# Color(r: uint8(getRandomValue(0,255)),g: uint8(getRandomValue(0,255)),b: uint8(getRandomValue(0,255)),a: uint8(getRandomValue(0,255)))
 
 proc show(l : int) =
   for n in 0 ..< l:
     for i in countdown(LastBit, 0):
-      if cached_lines[n].testB(i): drawRectangle(10 * i, 10 * n, 10,10, cell_color) else: continue
+      if cached_lines[n].testB(i): drawRectangle(SCALE * i, SCALE * n, SCALE,SCALE, cell_color) else: continue
 
   if counter >= time_4_line:
     counter -= time_4_line
