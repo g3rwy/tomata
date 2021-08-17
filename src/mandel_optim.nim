@@ -9,12 +9,14 @@ const
     WIDTH = 800
     HEIGHT = 450
     MaxThreads = 10
+    CENTER = (WIDTH / 2,HEIGHT/2)
 
 when WIDTH mod 4 != 0:
     raise newException(ValueError, "The width must be dividable by 4")
 
-when WIDTH mod MaxThreads != 0:
-    raise newException(ValueError, "The width must be dividable by amount of threads")
+when defined(threads):
+    when WIDTH mod MaxThreads != 0:
+        raise newException(ValueError, "The width must be dividable by amount of threads")
 
 # 921 600 pixels to compute in one frame, almost a million
 type
@@ -22,24 +24,31 @@ type
     vd2d = tuple[x: float64, y: float64]
 
 var
-    vScale : vd2d =  (WIDTH / 2.0 , HEIGHT.toFloat)
-    vOffset : vd2d = (-1.5, -0.5)
+    vScale : vd2d =  ((WIDTH / 2.0) / 2, HEIGHT.toFloat / 2)
+    vOffset : vd2d = (-2.5, -1.0)
     pFractal : array[WIDTH * HEIGHT,int64]
     
-    nIterations : int = 255
+    nIterations : int = 12
     
     pix_tl : vi2d =   (0 , 0)
     pix_br : vi2d =   (WIDTH,HEIGHT)
     fract_tl : vd2d = (-2.0,-1.0)
     fract_br : vd2d = (1.0 , 1.0)
-    test : m256d
-    
-    thr : array[0 .. MaxThreads - 1, Thread[tuple[p_tl,p_br : vi2d, fr_tl,fr_br:  vd2d, it: int]]] # needs --threads:on
+when defined(threads):
+    var thr : array[0 .. MaxThreads - 1, Thread[tuple[p_tl,p_br : vi2d, fr_tl,fr_br:  vd2d, it: int]]] # needs --threads:on
 
 
 proc screenToWorld(n : var vi2d, v: var vd2d) =
     v.x = n.x.toFloat / vScale.x + vOffset.x
     v.y = n.y.toFloat / vScale.y + vOffset.y
+
+proc screenToWorld(n : var vd2d, v: var vd2d) =
+    v.x = n.x / vScale.x + vOffset.x
+    v.y = n.y / vScale.y + vOffset.y
+
+proc worldToScreen(v: var vd2d, n: var vi2d) = 
+    n.x = int((v.x - vOffset.x) * vScale.x)
+    n.y = int((v.y - vOffset.y) * vScale.y)
 
 proc CreateFractalBasic(pix_tl,pix_br : var vi2d, fract_tl,fract_br: var vd2d, iterations: int) =
     let
@@ -174,22 +183,49 @@ proc CreateFractalIntrinsics(t : tuple[p_tl,p_br : vi2d, fr_tl,fr_br : vd2d, it:
         y_pos += y_scale
         y_offset += row_size
 
-proc CreateFractalThreadPool(pix_tl,pix_br : var vi2d, fract_tl,fract_br: var vd2d, Iterations: int) =
-    let
-        SectionWidth = (pix_br.x - pix_tl.x) div MaxThreads
-        FractalWidth : float = (fract_br.x - fract_tl.x) / MaxThreads
+when defined(threads):
+        proc CreateFractalThreadPool(pix_tl,pix_br : var vi2d, fract_tl,fract_br: var vd2d, Iterations: int) =
+            let
+                SectionWidth = (pix_br.x - pix_tl.x) div MaxThreads
+                FractalWidth : float = (fract_br.x - fract_tl.x) / MaxThreads
 
-    for i in 0 ..< MaxThreads:
-        createThread thr[i] , CreateFractalIntrinsics , (p_tl : (int(pix_tl.x + SectionWidth * i),pix_tl.y) , p_br: (int(pix_tl.x + SectionWidth * (i + 1)), pix_br.y), fr_tl: (float(fract_tl.x + FractalWidth * float(i)),fract_tl.y), fr_br: (float(fract_tl.x + FractalWidth * float(i + 1)),fract_br.y), it: Iterations)
-    
-    thr.joinThreads()
+            for i in 0 ..< MaxThreads: #                  some calculations on dividing screen into parts and giving them to function ->
+                createThread thr[i] , CreateFractalIntrinsics , (p_tl : (int(pix_tl.x + SectionWidth * i),pix_tl.y) , p_br: (int(pix_tl.x + SectionWidth * (i + 1)), pix_br.y), fr_tl: (float(fract_tl.x + FractalWidth * float(i)),fract_tl.y), fr_br: (float(fract_tl.x + FractalWidth * float(i + 1)),fract_br.y), it: Iterations)
 
+            thr.joinThreads()
+
+proc map(value, a_start,a_end,b_start,b_end:int64) : uint8 = uint8(b_start + ((value - a_start) * (b_end - b_start)) div (a_end - a_start))
 
 initWindow(WIDTH,HEIGHT,"Mandelbrot Optimized")
 
 #setTargetFPS(60)
+var 
+    cached_voffset : vd2d
+    cached_vscale : vd2d
+    cached_iterations : int
+    stop_gen : bool = false
 
 while not windowShouldClose():
+
+    var vPlace : vd2d = CENTER
+
+    var vBeforeZoom : vd2d
+    screenToWorld(vPlace,vBeforeZoom)
+
+    if isKeyDown(LEFT_BRACKET):
+        vScale.x *= 0.99
+        vScale.y *= 0.99
+
+    elif isKeyDown(RIGHT_BRACKET):
+        vScale.x *= 1.01
+        vScale.y *= 1.01
+
+    var vAfterZoom : vd2d
+    screenToWorld(vPlace, vAfterZoom)
+
+    vOffset.x += (vBeforeZoom.x - vAfterZoom.x)
+    vOffset.y += (vBeforeZoom.y - vAfterZoom.y)
+    
     if isKeyDown(Left):
         vOffset.x -= 7 / vScale.x
     elif isKeyDown(Right):
@@ -205,29 +241,31 @@ while not windowShouldClose():
     if isKeyReleased(Enter):
         nIterations = clamp(nIterations - 32,32,int.high)
     
-    if isKeyDown(LEFT_BRACKET):
-        vScale.x -= vScale.x / 10
-        vScale.y -= vScale.y / 10
-
-    elif isKeyDown(RIGHT_BRACKET):
-        vScale.x += vScale.x / 10
-        vScale.y += vScale.y / 10
-
-    #vScale.y += scroll 
-    #vScale.x += scroll
     
-    let delta = getFrameTime()
+    if (cached_voffset == vOffset and cached_vscale == vScale):
+        stop_gen = true
+        if cached_iterations != nIterations:
+            stop_gen = false   
+            cached_iterations = nIterations
+
+    else:
+        stop_gen = false
+        cached_voffset = vOffset
+        cached_vscale = vScale
+
     screenToWorld(pix_tl, fract_tl)
     screenToWorld(pix_br, fract_br)
-
     let start = getMonoTime()
-    CreateFractalThreadPool(pix_tl, pix_br, fract_tl, fract_br, nIterations)
-    #CreateFractalIntrinsics((pix_tl, pix_br, fract_tl, fract_br, nIterations))
-    #CreateFractalBasic(pix_tl, pix_br, fract_tl, fract_br, nIterations)
-    #CreateFractalPreCalc(pix_tl, pix_br, fract_tl, fract_br, nIterations)
-    
+    if not stop_gen:
+        when defined(threads):
+            CreateFractalThreadPool(pix_tl, pix_br, fract_tl, fract_br, nIterations)
+        else:
+            CreateFractalIntrinsics((pix_tl, pix_br, fract_tl, fract_br, nIterations))
+            #CreateFractalBasic(pix_tl, pix_br, fract_tl, fract_br, nIterations)
+            #CreateFractalPreCalc(pix_tl, pix_br, fract_tl, fract_br, nIterations)
+        
     let stop = getMonoTime()
-    
+
     beginDrawing()
     clearBackground(Gray)
     #let a = 0.1
@@ -237,8 +275,9 @@ while not windowShouldClose():
                 i : int64 = pFractal[y * WIDTH + x]
                 n = float32(i)
             #drawPixel(x,y, Color(r: uint8((0.5f * sin(a * n) + 0.5f) * 255) , g: uint8((0.5f * sin(a * n + 2.094f) + 0.5f) * 255) , b: uint8((0.5f * sin(a * n + 4.188f) + 0.5f) * 255) , a: 255))
-            let i_u8 = uint8(i)
+            let i_u8 = map(i,1,nIterations,0,255*3)
             drawPixel(x,y,Color(r: i_u8, g: i_u8, b: i_u8, a: 255))
+    
     drawText("took: " & $(stop - start),10,10,10,Violet)
     drawText("offset" & $vOffset,10,20,10,Violet)
     drawText("iterations: " & $nIterations,10,30,10,Violet)
