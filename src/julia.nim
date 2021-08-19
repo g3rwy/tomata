@@ -67,11 +67,13 @@ proc CreateJuliaSet() =
 
 
   for y in 0 ..< HEIGHT:
+    let cached_zi = y_something * (y - half_H) / y_scale + MoveY
+
     for x in countup(0 , WIDTH - 1 , 4):
       #TODO get rid of this entire computation
-      zr = set_pd(x_something * (x - half_W) / x_scale + MoveX, x_something * (x + 1 - half_W) / x_scale + MoveX, x_something * (x + 2 - half_W) / x_scale + MoveX, x_something * (x + 3 - half_W) / x_scale + MoveX)
-      zi = set1_pd_256(y_something * (y - half_H) / y_scale + MoveY)     
-      
+      zr = set_pd(x_something * (x - half_W) / x_scale + MoveX, x_something * (x + 1 - half_W) / x_scale + MoveX, x_something * (x + 2 - half_W) / x_scale + MoveX, x_something * (x + 3 - half_W) / x_scale + MoveX)     
+      zi = set1_pd_256(cached_zi)
+
       n = setzero_si256()
       while true:
         zr2 = mul_pd(zr, zr)
@@ -110,6 +112,7 @@ proc CreateJuliaSet() =
       pFractal[y * WIDTH + x + 1] = ints[2]
       pFractal[y * WIDTH + x + 0] = ints[3]
       #pFractal[y * WIDTH + x] = n
+
 when compileOption("threads"):
   proc CreateWithThreads() = 
     let
@@ -120,6 +123,7 @@ when compileOption("threads"):
       createThread thr[i], CreateJuliaSet
     
     thr.joinThreads()
+
 var counter = 0.0
 
 while not windowShouldClose():
@@ -161,7 +165,7 @@ while not windowShouldClose():
         i : int64 = pFractal[y * WIDTH + x]
         i_u8 = uint8(i)
 
-      drawPixel(x,y,Color(r: i_u8, g: i_u8, b: i_u8, a: 255))
+      drawPixel(x,y,Color(r: i_u8 ,g:  uint8(i_u8 * 1.5),b: uint8(i_u8 * 1.8),a: 255))
 
   drawText("iterations: " & $nIterations,10,30,10,Violet)  
   endDrawing()
