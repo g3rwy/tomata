@@ -1,39 +1,42 @@
 import nimraylib_now
 
-const
-  WIDTH = 1280
-  HEIGHT = 640
-  SCALE = 2
-  Size = WIDTH div SCALE
-  LastBit = Size - 1
-  Lines = Size div 2
 
-when WIDTH / HEIGHT != 2:
-  raise newException(ValueError,"the propotions of window must be 1:2")
+  #WIDTH = 1280
+  #HEIGHT = 640
+  #SCALE = 2
+  #Size = WIDTH div SCALE
+  #LastBit = Size - 1
+  #Lines = Size div 2
 
-var rule : uint8 = 250 # Main Rule, change it if you want it to start with other default rule 1-255
+var
+  SCALE* = 2
+  Size* = 1000 div 2
+  LastBit* = Size - 1
+  Lines* = Size div 2
+
+type
+  State* =  array[2000,bool]
  
-type State =  array[Size,bool] 
 
-template bitVal(state: State; n: typed): int = 
+
+template bitVal*(state: State; n: typed): int = 
   ord(state[LastBit - n] == true)
 
-proc setB(state: var State,x : int) =
+
+proc setB*(state: var State,x : int) =
   state[LastBit - x] = true
 
-proc ruleTest(x: int, Rule : uint8): bool = 
+proc ruleTest*(x: int, Rule : uint8): bool = 
   ## Return true if a bit must be set.
   (cast[int](Rule) and 1 shl (7 and x)) != 0
 
 var 
   newState: State
-  cached_lines : array[Lines, State]
-  curr_line : uint = 0
+  cached_lines* : array[700, State]
+  curr_line* : uint = 0
 
-initWindow(cint(WIDTH),cint(HEIGHT), "Elementary CA")
-#setTargetFPS(144)
 
-proc compute(state: var State, rule: uint8) =
+proc compute*(state: var State, rule: uint8) =
   newState.reset # sets all bools to default value (0)
   if ruleTest(state.bitVal(0) shl 2 or state.bitVal(LastBit) shl 1 or state.bitVal(LastBit-1), rule):
     newState.setB(LastBit)
@@ -49,11 +52,11 @@ proc compute(state: var State, rule: uint8) =
   state = newState
   inc curr_line
  
-proc testB(state : State, n : int) : bool =
+proc testB*(state : State, n : int) : bool =
   state[LastBit - n] == true
 
  
-proc gen(rule : uint8) =
+proc gen*(rule : uint8) =
   var state: State
   curr_line = 0
   state.setB(Lines)
@@ -61,12 +64,12 @@ proc gen(rule : uint8) =
     compute(state,rule)
 
 var
-  lines_rendered = 0
-  time_4_line = 0.01
+  lines_rendered* = 0
+  time_4_line* = 0.01
   counter : float32 = 0
-  cell_color : Color = (r: 0, g:50, b:220, a:255)
+  cell_color* : Color = (r: 0, g:50, b:220, a:255)
 
-proc show(l : int) =
+proc show*(l: int) =
   for n in 0 ..< l:
     for i in countdown(LastBit, 0):
       if cached_lines[n].testB(i): drawRectangle(SCALE * i, SCALE * n, SCALE,SCALE, cell_color) else: continue
@@ -74,25 +77,18 @@ proc show(l : int) =
   if counter >= time_4_line:
     counter -= time_4_line
     inc lines_rendered
-    
-gen(rule)
-while not windowShouldClose():
-  beginDrawing()
-  clearBackground(Raywhite)
-  show(lines_rendered)
-  drawText("Rule: " & $rule, 10, 10, 15, Maroon)
-  endDrawing()
-  counter += getFrameTime()
+  
+
+proc update*(delta : float32, rule : var uint8) = 
+  counter += delta
   if lines_rendered > Lines:
+    echo "reset lines_rendered"
     lines_rendered = 0
     rule = cast[uint8](getRandomValue(1,255))
     gen(rule)
 
-  # make it rainbow :3
-  #[
-  var hsv = cell_color.colorToHSV()
-  if hsv.x == 360: hsv.x = 0 else: hsv.x += 1
-  cell_color = colorFromHSV(hsv.x,hsv.y,hsv.z)
-  ]#
+proc update_counter*() = 
+  if counter >= time_4_line:
+    counter -= time_4_line
+    inc lines_rendered
 
-closeWindow()
