@@ -11,9 +11,6 @@ const
   WIDTH = 800
   HEIGHT = 450
 
-
-  range = 3.0
-
   MaxThreads = 10
 
 var
@@ -21,21 +18,23 @@ var
   MoveX = 0.0
   MoveY = 0.0
 
-when WIDTH mod 4 != 0:
+type
+  thread_julia = tuple[start,w,h:int]
+
+when WIDTH mod 8 != 0: # 8 because of SIMD
   raise newException(ValueError,"The WIDTH of window must be dividable by 4")
 
 when compileOption("threads"):
   import locks
-  var thr : array[0 .. MaxThreads - 1, Thread[void]]
+  var thr : array[0 .. MaxThreads - 1, Thread[thread_julia]]
   when WIDTH mod MaxThreads != 0:
     raise newException(ValueError,"The WIDTH of window must be dividable by amount of Threads")
 
 
 var
-  nIterations : int = 100
+  nIterations : int = 50
 
-  pFractal : array[WIDTH * HEIGHT,int64]
-
+  pFractal : array[WIDTH * HEIGHT,int32]
 
 initWindow(cint(WIDTH),cint(HEIGHT), "Burning Ship")
 #setTargetFPS(144)
@@ -63,7 +62,7 @@ proc CreateBurningShip() =
 
             pFractal[y * WIDTH + x] = n
 
-proc CreateShipSIMD() = 
+proc CreateShipSIMD(p : thread_julia) = 
   let
     x_scale: float = 1.5 / float64(WIDTH) * Zoom 
     y_scale: float = 2.0 / float64(HEIGHT) * Zoom
@@ -86,10 +85,10 @@ proc CreateShipSIMD() =
 
   iterations = set1_epi32_256(nIterations)
 
-  for y in 0 ..< HEIGHT:
+  for y in 0 ..< p.h:
     ci = set1_ps_256(y * y_scale + -1.0 + MoveY)
-    for x in countup(0,WIDTH - 1 , 8):
-      # just concept
+    for x in countup(p.start,p.w - 1 , 8):
+      # oh god what is this, i don't know how to get rid of it for now but i will know soon
       cr = set_ps(x * x_scale + -2.5 + MoveX,(x+1)  * x_scale + -2.5 + MoveX,(x+2)  * x_scale + -2.5 + MoveX, (x+3) * x_scale + -2.5 + MoveX,    (x+4) * x_scale + -2.5 + MoveX,(x+5)  * x_scale + -2.5 + MoveX,(x+6)  * x_scale + -2.5 + MoveX, (x+7) * x_scale + -2.5 + MoveX)
 
       zr = setzero_ps()
@@ -145,10 +144,23 @@ proc CreateShipSIMD() =
         pFractal[y * WIDTH + x + 1] = ints[6]
         pFractal[y * WIDTH + x + 0] = ints[7]
 
+when compileOption("threads"):
+  proc BurningThreads() = 
+    let
+      SectionWidth = WIDTH div MaxThreads
+    
+    for i in 0 ..< MaxThreads:
+      createThread thr[i], CreateShipSIMD , (start: SectionWidth * i,w:WIDTH,h:HEIGHT)
+    
+    thr.joinThreads()
 
 while not windowShouldClose():
   #CreateBurningShip()
-  CreateShipSIMD()
+  when compileOption("threads"):
+    BurningThreads()
+  else:
+    CreateShipSIMD((start : 0, w: WIDTH, h: HEIGHT))
+
   if isKeyDown(Space):
     nIterations += 10
   elif isKeyDown(Right_Shift):

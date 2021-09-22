@@ -20,13 +20,16 @@ const
 var
   Cy = -0.2321
   Cx = -0.835
+type
+  thread_julia = tuple[start,w,h:int]
+
   
 when WIDTH mod 4 != 0:
   raise newException(ValueError,"The WIDTH of window must be dividable by 4")
 
 when compileOption("threads"):
   import locks
-  var thr : array[0 .. MaxThreads - 1, Thread[void]]
+  var thr : array[0 .. MaxThreads - 1, Thread[thread_julia]]
   when WIDTH mod MaxThreads != 0:
     raise newException(ValueError,"The WIDTH of window must be dividable by amount of Threads")
 
@@ -41,7 +44,7 @@ var
 initWindow(cint(WIDTH),cint(HEIGHT), "Julia set")
 #setTargetFPS(144)
 
-proc CreateJuliaSet() =
+proc CreateJuliaSet(p : thread_julia) =
   var
     a,b,mask1,two,four : m256d
     zr,zi,zr2,zi2,cr,ci : m256d
@@ -66,10 +69,11 @@ proc CreateJuliaSet() =
     y_scale = (0.5 * Zoom * HEIGHT)
 
 
-  for y in 0 ..< HEIGHT:
+  for y in 0 ..< p.h:
     let cached_zi = y_something * (y - half_H) / y_scale + MoveY
 
-    for x in countup(0 , WIDTH - 1 , 4):
+    for x in countup(p.start, p.w - 1 , 4):
+      
       #TODO get rid of this entire computation
       zr = set_pd(x_something * (x - half_W) / x_scale + MoveX, x_something * (x + 1 - half_W) / x_scale + MoveX, x_something * (x + 2 - half_W) / x_scale + MoveX, x_something * (x + 3 - half_W) / x_scale + MoveX)     
       zi = set1_pd_256(cached_zi)
@@ -117,10 +121,10 @@ when compileOption("threads"):
   proc CreateWithThreads() = 
     let
       SectionWidth = WIDTH div MaxThreads
-      FractalWidth : float = HEIGHT / MaxThreads
+      #FractalWidth : float = HEIGHT / MaxThreads
     
     for i in 0 ..< MaxThreads:
-      createThread thr[i], CreateJuliaSet
+      createThread thr[i], CreateJuliaSet , (start: SectionWidth * i,w:WIDTH,h:HEIGHT)
     
     thr.joinThreads()
 
@@ -130,7 +134,7 @@ while not windowShouldClose():
   when compileOption("threads"):
     CreateWithThreads()
   else:
-    CreateJuliaSet()
+    CreateJuliaSet((start : 0, w: WIDTH, h: HEIGHT))
   
   counter += getFrameTime() / 3
   Cx = sin(counter)

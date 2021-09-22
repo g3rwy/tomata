@@ -3,7 +3,7 @@ import std/monotimes
 import complex,lenientops,math
 import simd/x86_avx
 import simd/x86_avx2
-import locks
+from system import compileOption
 
 const
     WIDTH = 800
@@ -11,12 +11,16 @@ const
     MaxThreads = 10
     CENTER = (WIDTH / 2,HEIGHT/2)
 
+when compileOption("threads"):
+    import locks
+    when WIDTH mod MaxThreads != 0:
+        raise newException(ValueError, "The width must be dividable by amount of threads")
+
 when WIDTH mod 4 != 0:
     raise newException(ValueError, "The width must be dividable by 4")
 
-when defined(threads):
-    when WIDTH mod MaxThreads != 0:
-        raise newException(ValueError, "The width must be dividable by amount of threads")
+
+
 
 # 921 600 pixels to compute in one frame, almost a million
 type
@@ -25,17 +29,20 @@ type
 
 var
     vScale : vd2d =  ((WIDTH / 2.0) / 2, HEIGHT.toFloat / 2)
+    #vScale : vd2d =  ((WIDTH / 2.0) / 2, HEIGHT.toFloat / 2)
     vOffset : vd2d = (-2.5, -1.0)
+    #vOffset : vd2d = (0.0, 0.0)
     pFractal : array[WIDTH * HEIGHT,int64]
     
-    nIterations : int = 12
+    nIterations : int = 500
     
     pix_tl : vi2d =   (0 , 0)
     pix_br : vi2d =   (WIDTH,HEIGHT)
     fract_tl : vd2d = (-2.0,-1.0)
     fract_br : vd2d = (1.0 , 1.0)
-when defined(threads):
-    var thr : array[0 .. MaxThreads - 1, Thread[tuple[p_tl,p_br : vi2d, fr_tl,fr_br:  vd2d, it: int]]] # needs --threads:on
+
+when compileOption("threads"):
+    var thr : array[0 .. MaxThreads - 1, Thread[tuple[p_tl,p_br : vi2d, fr_tl,fr_br:  vd2d, it: int]]]
 
 
 proc screenToWorld(n : var vi2d, v: var vd2d) =
@@ -58,6 +65,7 @@ proc CreateFractalBasic(pix_tl,pix_br : var vi2d, fract_tl,fract_br: var vd2d, i
     for y in pix_tl.y ..< pix_br.y:
         for x in pix_tl.x ..< pix_br.x:
             let c = complex(x * x_scale + fract_tl.x , y * y_scale + fract_tl.y)
+            
             var
                 z = complex(0.0 , 0.0)
                 n : int = 0 # lol kinda want to limit the iterations, not to use entire int but uint16 is enough 
@@ -167,7 +175,7 @@ proc CreateFractalIntrinsics(t : tuple[p_tl,p_br : vi2d, fr_tl,fr_br : vd2d, it:
                 
 
                 c = and_si256(one, mask2)
-                n = add_epi64(n,c) # only 1 iteration
+                n = add_epi64(n,c)
                 
                 if movemask_pd(castsi256_pd(mask2)) == 0: # if its greater than 0, repeat, should break only if its all 0
                     break
@@ -183,16 +191,16 @@ proc CreateFractalIntrinsics(t : tuple[p_tl,p_br : vi2d, fr_tl,fr_br : vd2d, it:
         y_pos += y_scale
         y_offset += row_size
 
-when defined(threads):
-        proc CreateFractalThreadPool(pix_tl,pix_br : var vi2d, fract_tl,fract_br: var vd2d, Iterations: int) =
-            let
-                SectionWidth = (pix_br.x - pix_tl.x) div MaxThreads
-                FractalWidth : float = (fract_br.x - fract_tl.x) / MaxThreads
+when compileOption("threads"):
+    proc CreateFractalThreadPool(pix_tl,pix_br : var vi2d, fract_tl,fract_br: var vd2d, Iterations: int) =
+        let
+            SectionWidth = (pix_br.x - pix_tl.x) div MaxThreads
+            FractalWidth : float = (fract_br.x - fract_tl.x) / MaxThreads
 
-            for i in 0 ..< MaxThreads: #                  some calculations on dividing screen into parts and giving them to function ->
-                createThread thr[i] , CreateFractalIntrinsics , (p_tl : (int(pix_tl.x + SectionWidth * i),pix_tl.y) , p_br: (int(pix_tl.x + SectionWidth * (i + 1)), pix_br.y), fr_tl: (float(fract_tl.x + FractalWidth * float(i)),fract_tl.y), fr_br: (float(fract_tl.x + FractalWidth * float(i + 1)),fract_br.y), it: Iterations)
+        for i in 0 ..< MaxThreads: #                  some calculations on dividing screen into parts and giving them to function ->
+            createThread thr[i] , CreateFractalIntrinsics , (p_tl : (int(pix_tl.x + SectionWidth * i),pix_tl.y) , p_br: (int(pix_tl.x + SectionWidth * (i + 1)), pix_br.y), fr_tl: (float(fract_tl.x + FractalWidth * float(i)),fract_tl.y), fr_br: (float(fract_tl.x + FractalWidth * float(i + 1)),fract_br.y), it: Iterations)
 
-            thr.joinThreads()
+        thr.joinThreads()
 
 proc map(value, a_start,a_end,b_start,b_end:int64) : uint8 = uint8(b_start + ((value - a_start) * (b_end - b_start)) div (a_end - a_start))
 
@@ -255,15 +263,15 @@ while not windowShouldClose():
 
     screenToWorld(pix_tl, fract_tl)
     screenToWorld(pix_br, fract_br)
+
     let start = getMonoTime()
     if not stop_gen:
-        when defined(threads):
+        when compileOption("threads"):
             CreateFractalThreadPool(pix_tl, pix_br, fract_tl, fract_br, nIterations)
         else:
             CreateFractalIntrinsics((pix_tl, pix_br, fract_tl, fract_br, nIterations))
             #CreateFractalBasic(pix_tl, pix_br, fract_tl, fract_br, nIterations)
             #CreateFractalPreCalc(pix_tl, pix_br, fract_tl, fract_br, nIterations)
-        
     let stop = getMonoTime()
 
     beginDrawing()
@@ -273,10 +281,14 @@ while not windowShouldClose():
         for x in pix_tl.x ..< pix_br.x:
             let
                 i : int64 = pFractal[y * WIDTH + x]
-                n = float32(i)
+                #n = float32(i)
             #drawPixel(x,y, Color(r: uint8((0.5f * sin(a * n) + 0.5f) * 255) , g: uint8((0.5f * sin(a * n + 2.094f) + 0.5f) * 255) , b: uint8((0.5f * sin(a * n + 4.188f) + 0.5f) * 255) , a: 255))
-            let i_u8 = map(i,1,nIterations,0,255*3)
-            drawPixel(x,y,Color(r: i_u8, g: i_u8, b: i_u8, a: 255))
+            let i_u8 = uint8(i)
+            if i == nIterations:
+                drawPixel(x,y,White)
+                continue
+            drawPixel(x,y,Color(r: i_u8 ,g:  uint8(i_u8 * 1.5),b: uint8(i_u8 * 1.8),a: 255))
+            #drawPixel(x,y,Color(r: i_u8, g: i_u8, b: i_u8, a: 255))
     
     drawText("took: " & $(stop - start),10,10,10,Violet)
     drawText("offset" & $vOffset,10,20,10,Violet)

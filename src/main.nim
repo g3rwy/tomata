@@ -6,6 +6,7 @@
 import nimraylib_now
 import rule as elementar
 import life
+import ants
 
 const
     W_WIDTH = 1280
@@ -48,7 +49,13 @@ while not windowShouldClose():
 
 
     of 1: # Ants
-        discard
+        for i ,c in terrarium.pairs:
+            for j ,place in c.pairs:
+        #let x = (BUFFER_SCALE * j)
+        #let y = (BUFFER_SCALE * i)
+                drawRectangle((BUFFER_SCALE * j),(BUFFER_SCALE * i) + W_HEIGHT - CONTENT_H, BUFFER_SCALE , BUFFER_SCALE , cell_colors[place.ord])
+
+        drawRectangleLines(cint(BUFFER_SCALE * Ant.y),cint(BUFFER_SCALE * Ant.x + W_HEIGHT - CONTENT_H), BUFFER_SCALE, BUFFER_SCALE, Red)
     of 2: # Elementar
         for n in 0 ..< lines_rendered:
             for i in countdown(LastBit, 0): #? thinking of a way to get elementar to scale in good way, with size and all
@@ -90,7 +97,7 @@ while not windowShouldClose():
     of 0: # Game of Life
         life.update()
     of 1: # Ants
-        discard
+        ants.update()
     of 2: # Elementar
         if CONTENT_W div CONTENT_H != 2:
             raise newException(ValueError,"!!!!!! the propotions of window must be 1:2 !!!!!!!")
@@ -99,4 +106,4 @@ while not windowShouldClose():
     else:
         discard
 
-closeWindow()
+closeWindow()## here is everything for the app
