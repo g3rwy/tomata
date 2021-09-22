@@ -79,15 +79,13 @@ proc show*(l: int) =
     inc lines_rendered
   
 
-proc update*(delta : float32, rule : var uint8) = 
-  counter += delta
+proc update*(rule : var uint8) = 
+  counter += getFrameTime()
   if lines_rendered > Lines:
-    echo "reset lines_rendered"
     lines_rendered = 0
     rule = cast[uint8](getRandomValue(1,255))
     gen(rule)
 
-proc update_counter*() = 
   if counter >= time_4_line:
     counter -= time_4_line
     inc lines_rendered

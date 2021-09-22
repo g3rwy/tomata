@@ -53,7 +53,6 @@ while not windowShouldClose():
         for n in 0 ..< lines_rendered:
             for i in countdown(LastBit, 0): #? thinking of a way to get elementar to scale in good way, with size and all
                 if cached_lines[n].testB(i): drawRectangle(SCALE * i, SCALE * n + W_HEIGHT - CONTENT_H, SCALE,SCALE, cell_color) else: continue
-        update_counter()
 
     else:
         discard
