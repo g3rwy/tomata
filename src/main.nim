@@ -7,16 +7,17 @@ import nimraylib_now
 import rule as elementar
 import life
 import ants
+import virus
 
 const
     W_WIDTH = 1280
     W_HEIGHT = 720 ## Window size
 
 let
-    automatas = ["Game of Life", "Ants" , "Elementar CA"]
+    automatas = ["Game of Life", "Ants" , "Elementar CA", "Virus"]
 
 var
-    curr_tomata = 0
+    curr_tomata = 3
     CONTENT_W = 1000
     CONTENT_H = 600 ## Content size (Cellular automata and fractals)
     # ========== Elementar variables =========
@@ -41,7 +42,7 @@ while not windowShouldClose():
     
     case curr_tomata:
     of 0: # Game of Life  
-        for i ,c in base[].pairs:
+        for i ,c in life.base[].pairs:
             for j ,states in c.pairs:
         #let x = (BUFFER_SCALE * j)
         #let y = (BUFFER_SCALE * i)
@@ -63,12 +64,26 @@ while not windowShouldClose():
             for i in countdown(LastBit, 0): #? thinking of a way to get elementar to scale in good way, with size and all
                 if cached_lines[n].testB(i): drawRectangle(SCALE * i, SCALE * n + W_HEIGHT - CONTENT_H, SCALE,SCALE, cell_color) else: continue
 
+    of 3:
+        for i ,c in virus.base[].pairs:
+            for j ,human in c.pairs:
+                drawRectangle((BUFFET_SCALE * j) ,(BUFFET_SCALE * i) + W_HEIGHT - CONTENT_H, BUFFET_SCALE, BUFFET_SCALE , virus.states_colors[human.state])
+
+        virus.tickspeed = slider((float64(W_WIDTH - 230), 260'f64, 230'f64, 10'f64),"speed:","",virus.tick_speed,0.0,1.0)
+        discard valueBox((float64(W_WIDTH - 200), 320'f64, 40'f64, 30'f64),"Deadlyness",virus.lethal.addr,0,100,false)
+
+        drawText("Healthy People: " & $virus.healthy_ppl,W_WIDTH - 200,500,13,Black)
+        drawText("Infected People: " & $virus.sick_ppl,W_WIDTH - 200,530,13,Black)
+        drawText("Cured People: " & $virus.cured_ppl,W_WIDTH - 200,560,13,Black)
+        drawText("Dead People: " & $virus.dead_ppl,W_WIDTH - 200,590,13,Black)
+
     else:
         discard
 
 
-    drawText("Here should be: " & automatas[curr_tomata],(W_HEIGHT - CONTENT_H) div 2 + 100, CONTENT_H div 2, 20, Black)
+    #drawText("Here should be: " & automatas[curr_tomata],(W_HEIGHT - CONTENT_H) div 2 + 100, CONTENT_H div 2, 20, Black)
     drawText("Here should be UI",W_WIDTH - 180, 400, 15, Black)
+
     if button((x:W_WIDTH - 255.0,y:150.0,width:70.0,height:40.0),"PAUSE"):
         life.play = not life.play
         ants.play = not ants.play
@@ -109,6 +124,9 @@ while not windowShouldClose():
         if CONTENT_W div CONTENT_H != 2:
             raise newException(ValueError,"!!!!!! the propotions of window must be 1:2 !!!!!!!")
         elementar.update(rule)
+
+    of 3:
+        virus.update()
 
     else:
         discard

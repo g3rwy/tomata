@@ -2,8 +2,6 @@ import nimraylib_now
 
 var
   BUFFET_SCALE* = 2
-  WIDTH* = 600
-  HEIGHT* = 600
 
 type
   human = tuple[state: uint8, counter: uint8,reg_time: uint8]
@@ -16,6 +14,11 @@ var
   play* : bool = true
   tick_speed* : float32 = 0.0 # default value is Delta
   counter : float32 = 0.0 # used to count when the tick should update
+  
+  healthy_ppl* = (300 * 500) - 1
+  dead_ppl* = 0
+  sick_ppl* = 1
+  cured_ppl* = 0
 
   lethal* : cint = 6 # in % of deadly is virus
 
@@ -53,8 +56,14 @@ proc update*() =
             if c.counter >= c.reg_time: # is cured
               if getRandomValue(0,100) >= (100 - lethal):
                 base[i][j].state = 3
+                dec sick_ppl
+                inc dead_ppl
+
               else:
                 base[i][j].state = 2
+                dec sick_ppl
+                inc cured_ppl
+
             else:
               inc base[i][j].counter
             continue
@@ -68,6 +77,9 @@ proc update*() =
             if c.state == 0 and is_infected:
               base[i][j].state = 1 # gets infected
               base[i][j].reg_time = cast[uint8](getRandomValue(1,50))
+              
+              dec healthy_ppl
+              inc sick_ppl
 
       inc steps
       counter -= tick_speed
@@ -80,3 +92,7 @@ proc update*() =
   if isKeyReleased(Enter): # RESET
     base[] = default(cell_grid)
     base[getRandomValue(0,300)][getRandomValue(0,300)].state = 1 # random person is infected
+    healthy_ppl = (300 * 500) - 1
+    dead_ppl = 0
+    sick_ppl = 1
+    cured_ppl = 0
